@@ -124,51 +124,30 @@ This application implements a complete authentication flow:
 The application uses Zustand for state management. The main authentication store is defined in `src/stores/use-auth-store.ts`:
 
 ```typescript
-import { create } from 'zustand'
-import { auth, githubProvider } from '../lib/firebase'
-import { User, signInWithPopup, signOut } from 'firebase/auth'
+import type { User } from "firebase/auth";
+import { create } from "zustand";
 
-interface AuthState {
-  user: User | null
-  loading: boolean
-  error: string | null
-  signInWithGithub: () => Promise<void>
-  signOutUser: () => Promise<void>
-}
+export type AuthState = {
+    isAuthenticated: boolean;
+    user: User | null;
+    setUser: (user: User | null) => void;
+};
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  loading: true,
-  error: null,
-  
-  signInWithGithub: async () => {
-    try {
-      set({ loading: true, error: null })
-      await signInWithPopup(auth, githubProvider)
-    } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ loading: false })
-    }
-  },
-  
-  signOutUser: async () => {
-    try {
-      set({ loading: true, error: null })
-      await signOut(auth)
-      set({ user: null })
-    } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ loading: false })
-    }
-  }
-}))
-
-// Initialize auth state listener
-auth.onAuthStateChanged((user) => {
-  useAuthStore.setState({ user, loading: false })
-})
+    isAuthenticated: false,
+    user: null,
+    setUser: (user: User | null) => {
+        console.log(
+            "Auth state changed:",
+            user ? `User logged in: ${user.email || user.uid}` : "User logged out",
+            user
+        );
+        return set({
+            user,
+            isAuthenticated: !!user,
+        });
+    },
+}));
 ```
 
 ## TanStack Router Configuration
@@ -179,93 +158,6 @@ The application uses TanStack Router for type-safe routing. The routes are organ
 - `src/routes/root.tsx` - Root route definition
 - `src/routes/_auth.tsx` - Authentication routes
 - `src/routes/(public)/*` - Publicly accessible routes
-
-Example route configuration:
-
-```typescript
-import { Router, Route, RootRoute } from '@tanstack/react-router'
-import { HomePage } from '../pages/Home'
-import { LoginPage } from '../pages/Login'
-import { DashboardPage } from '../pages/Dashboard'
-import { ProfilePage } from '../pages/Profile'
-import { ProtectedRoute } from '../components/ProtectedRoute'
-
-// Define root route
-const rootRoute = new RootRoute()
-
-// Public routes
-const homeRoute = new Route({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: HomePage,
-})
-
-const loginRoute = new Route({
-  getParentRoute: () => rootRoute,
-  path: '/login',
-  component: LoginPage,
-})
-
-// Protected routes
-const dashboardRoute = new Route({
-  getParentRoute: () => rootRoute,
-  path: '/dashboard',
-  component: () => (
-    <ProtectedRoute>
-      <DashboardPage />
-    </ProtectedRoute>
-  ),
-})
-
-const profileRoute = new Route({
-  getParentRoute: () => rootRoute,
-  path: '/profile',
-  component: () => (
-    <ProtectedRoute>
-      <ProfilePage />
-    </ProtectedRoute>
-  ),
-})
-
-// Create the router with all routes
-const routeTree = rootRoute.addChildren([
-  homeRoute,
-  loginRoute,
-  dashboardRoute,
-  profileRoute,
-])
-
-export const router = new Router({ routeTree })
-```
-
-## Protected Routes
-
-The application implements route protection with a `ProtectedRoute` component:
-
-```typescript
-import { Navigate } from '@tanstack/react-router'
-import { useAuthStore } from '../stores/use-auth-store'
-
-interface ProtectedRouteProps {
-  children: React.ReactNode
-}
-
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, loading } = useAuthStore()
-
-  if (loading) {
-    return <div>Loading...</div>
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />
-  }
-
-  return <>{children}</>
-}
-```
-
-In the actual project, this protection logic may be implemented directly in the route definitions or through the auth context provider.
 
 ## Firebase Configuration
 
@@ -289,16 +181,7 @@ const app = initializeApp(firebaseConfig)
 
 // Initialize Firebase Auth
 export const auth = getAuth(app)
-export const githubProvider = new GithubAuthProvider()
 ```
-
-## Common Issues & Troubleshooting
-
-### Authentication Issues
-
-- **GitHub OAuth not working**: Ensure your GitHub OAuth app has the correct callback URL
-- **Redirect errors**: Check that your Firebase Auth domain matches your environment setup
-- **CORS errors**: Ensure your Firebase project has the correct domains listed in the authorized domains
 
 ### Environment Variables
 
@@ -309,47 +192,6 @@ export const githubProvider = new GithubAuthProvider()
 
 - If you experience routing issues, ensure you've properly wrapped your application with the router provider
 - Check that all routes are correctly defined and imported
-
-## Deployment
-
-### Firebase Hosting
-
-1. Install Firebase CLI:
-```bash
-npm install -g firebase-tools
-```
-
-2. Login to Firebase:
-```bash
-firebase login
-```
-
-3. Initialize Firebase Hosting:
-```bash
-firebase init hosting
-```
-
-4. Build your project:
-```bash
-npm run build
-```
-
-5. Deploy to Firebase:
-```bash
-firebase deploy
-```
-
-### Other Hosting Options
-
-You can also deploy this application to platforms like Vercel, Netlify, or GitHub Pages. Make sure to:
-
-1. Add your environment variables in the platform's settings
-2. Configure the build command (`npm run build`)
-3. Set the publish directory (`dist`)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
